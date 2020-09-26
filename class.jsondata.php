@@ -87,7 +87,7 @@ class JsonDataOrm {
 		$data = [];
 		
 		foreach($add_meta_keys as $key) {
-			$data['meta'][$key] = $ref->getMetaAttr($key);
+			$data['__meta__'][$key] = $ref->getMetaAttr($key);
 		}
 		
 		foreach($ref as $key=>$val) {
@@ -99,25 +99,25 @@ class JsonDataOrm {
 	}
 	
 	function genUuid() {
-	    return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-	        // 32 bits for "time_low"
-	        mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
+		return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+			// 32 bits for "time_low"
+			mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
 
-	        // 16 bits for "time_mid"
-	        mt_rand( 0, 0xffff ),
+			// 16 bits for "time_mid"
+			mt_rand( 0, 0xffff ),
 
-	        // 16 bits for "time_hi_and_version",
-	        // four most significant bits holds version number 4
-	        mt_rand( 0, 0x0fff ) | 0x4000,
+			// 16 bits for "time_hi_and_version",
+			// four most significant bits holds version number 4
+			mt_rand( 0, 0x0fff ) | 0x4000,
 
-	        // 16 bits, 8 bits for "clk_seq_hi_res",
-	        // 8 bits for "clk_seq_low",
-	        // two most significant bits holds zero and one for variant DCE1.1
-	        mt_rand( 0, 0x3fff ) | 0x8000,
+			// 16 bits, 8 bits for "clk_seq_hi_res",
+			// 8 bits for "clk_seq_low",
+			// two most significant bits holds zero and one for variant DCE1.1
+			mt_rand( 0, 0x3fff ) | 0x8000,
 
-	        // 48 bits for "node"
-	        mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
-	    );
+			// 48 bits for "node"
+			mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
+		);
 	}
 
 	
@@ -169,7 +169,7 @@ class JsonDataOrm {
 		return(unlink($lock_file));
 	}
 	
-	// moved ::read() function to JsonDataItem->read()
+	// moved ::read() to JsonDataItem->read()
 	
 	function write($ref) {		
 		// put it in file
@@ -222,9 +222,9 @@ class JsonDataOrm {
 
 
 class JsonDataItem {
-	protected $meta = ['orm'=>JsonDataOrm];
-	// $meta['id']
-	// $meta['orm']
+	protected $__meta__ = ['orm'=>JsonDataOrm];
+	// $__meta__['id']
+	// $__meta__['orm']
 
 
 	public function __construct($id=null, $read=true, $lock=false) {
@@ -244,9 +244,9 @@ class JsonDataItem {
 		}
 	}
 	
-    public function __toString() {
-    	return(sprintf("%s(%s)",get_class($this), $this->id())); 
-    }
+	public function __toString() {
+		return(sprintf("%s(%s)",get_class($this), $this->id())); 
+	}
 		
 	public function setId($id=false) {
 		if($this->id() !== null ) {
@@ -254,47 +254,47 @@ class JsonDataItem {
 		}
 		
 		// set id or create new:	
-		$this->setMetaAttr('id', $id ? $id : $this->meta['orm']::genUuid());
+		$this->setMetaAttr('id', $id ? $id : $this->__meta__['orm']::genUuid());
 		
 	}
 	
 	public function id() {
-		return(isset($this->meta['id']) ? $this->meta['id'] : null );
+		return(isset($this->__meta__['id']) ? $this->__meta__['id'] : null );
 	}
 	
 	public function created_at($format='c') {
-		return(date($format, $this->meta['created_at']));
+		return(date($format, $this->__meta__['created_at']));
 	}
 
 	public function updated_at($format='c') {
-		if($this->meta['updated_at'] === null ) {
+		if($this->__meta__['updated_at'] === null ) {
 			if( $this->is_new() ) { throw new Exception("There is no 'updated_at' timestamp, item is new."); }
 
-			$time_stamps = $this->meta['orm']::getFileTimeStamps($this);
-			$this->meta['updated_at'] = $time_stamps['updated_at'];
-			$this->meta['accessed_at'] = $time_stamps['accessed_at'];
+			$time_stamps = $this->__meta__['orm']::getFileTimeStamps($this);
+			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
+			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
 		}		
-		return(date($format, $this->meta['updated_at']));
+		return(date($format, $this->__meta__['updated_at']));
 	}
 
 	public function accessed_at($format='c') {
-		if($this->meta['updated_at'] === null ) {
+		if($this->__meta__['updated_at'] === null ) {
 			if( $this->is_new() ) { throw new Exception("There is no 'accessed_at' timestamp, item is new."); }
 
-			$time_stamps = $this->meta['orm']::getFileTimeStamps($this);
-			$this->meta['updated_at'] = $time_stamps['updated_at'];
-			$this->meta['accessed_at'] = $time_stamps['accessed_at'];
+			$time_stamps = $this->__meta__['orm']::getFileTimeStamps($this);
+			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
+			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
 		}
 		
-		return(date($format, $this->meta['accessed_at']));
+		return(date($format, $this->__meta__['accessed_at']));
 	}
 
 	public function getMetaAttr($key, $defaul=null) {
-		return(isset($this->meta[$key]) ? $this->meta[$key] : $default);
+		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
 
 	private function setMetaAttr($key, $value) {
-		$this->meta[$key] = $value;
+		$this->__meta__[$key] = $value;
 	}
 
 
@@ -309,12 +309,12 @@ class JsonDataItem {
 
 	public function as_json() {
 		// pass this to JsonDataOrm::function
-		return($this->meta['orm']::as_json($this));
+		return($this->__meta__['orm']::as_json($this));
 	}
 	
 	public function getFilePath($type='json') {
 		// pass this to JsonDataOrm::function
-		return($this->meta['orm']::getFilePath($this));
+		return($this->__meta__['orm']::getFilePath($this));
 	}
 	
 	public function is_new() {
@@ -325,19 +325,19 @@ class JsonDataItem {
 		// obtain lock incase we read for write.
 		if($lock) {
 			// try to obtain lock first
-			if(!$this->meta['orm']::lock($this)) {
+			if(!$this->__meta__['orm']::lock($this)) {
 				throw new Exception("Can't obtain lock for '$ref'.");
 			}
 		}
 		
-		$json_file = $this->meta['orm']::getFilePath($this);
+		$json_file = $this->__meta__['orm']::getFilePath($this);
 		$json_data = json_decode(file_get_contents($json_file), true);
 
 		// get meta values
-		foreach($json_data['meta'] as $key=>$val) {
+		foreach($json_data['__meta__'] as $key=>$val) {
 			$this->setMetaAttr($key, $val);
 		}
-		unset($json_data['meta']); 
+		unset($json_data['__meta__']); 
 		
 		// get data values:
 		foreach($json_data as $key=>$val) {
@@ -357,39 +357,39 @@ class JsonDataItem {
 
 	public function write() {			
 		// pass this to JsonDataOrm::function
-		return($this->meta['orm']::write($this));
+		return($this->__meta__['orm']::write($this));
 	}
 	
 	public function delete() {
 		// pass this to JsonDataOrm::function
-		return($this->meta['orm']::delete($this, $this->id()));
+		return($this->__meta__['orm']::delete($this, $this->id()));
 	}
 	
 }
 
 
 class JsonDataCollection {
-	// public $meta = [];
-	protected $meta = ['orm'=>JsonDataOrm];
+	// public $__meta__ = [];
+	protected $__meta__ = ['orm'=>JsonDataOrm];
 
-	// $meta['orm']
+	// $__meta__['orm']
 		
 	public function __construct() {
 	}
 	
 	
 	public function getMetaAttr($key, $defaul=null) {
-		return(isset($this->meta[$key]) ? $this->meta[$key] : $default);
+		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
 
 	public function setMetaAttr($key, $value) {
-		$this->meta[$key] = $value;
+		$this->__meta__[$key] = $value;
 	}
 
 	
 	public function find($id, $read=true, $lock=false) {
 		
-		$json_file = $this->meta['orm']::getFilePathWithId($this, $id);
+		$json_file = $this->__meta__['orm']::getFilePathWithId($this, $id);
 		if ( file_exists($json_file) ) {
 			return($read ? $this->read($id, $lock) : true);
 		}
@@ -398,7 +398,7 @@ class JsonDataCollection {
 	
 	public function new($data=[]) {
 		// $item_classname = $this->getMetaAttr('item_classname');
-		$item_classname = $this->meta['orm']::getItemClassName(get_class($this));
+		$item_classname = $this->__meta__['orm']::getItemClassName(get_class($this));
 		$item = new $item_classname();
 		
 		// set data:
@@ -410,7 +410,7 @@ class JsonDataCollection {
 	}
 	
 	public function read($id, $lock=false) {
-		$item_classname = $this->meta['orm']::getItemClassName(get_class($this));
+		$item_classname = $this->__meta__['orm']::getItemClassName(get_class($this));
 		$item = new $item_classname($id, true, $lock);
 				
 		return($item);
@@ -418,6 +418,6 @@ class JsonDataCollection {
 
 	public function delete($id) {
 		// pass this to JsonDataOrm::function
-		return($this->meta['orm']::delete($this, $id));
+		return($this->__meta__['orm']::delete($this, $id));
 	}
 }
