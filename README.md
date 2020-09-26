@@ -1,8 +1,6 @@
 # php-JsonData
 
-Simple json datastore written in php. with basic CRUD function, *create*, read, update, delete. read,write with write-lock capabilities. All data is firts written to an temp file to prevent any dataloss.  
-
-
+Simple json datastore written in php. with basic CRUD function, *create*, read, update, delete. read,write with write-lock capabilities. 
 
 
 ### setup your Models
