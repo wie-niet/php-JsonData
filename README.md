@@ -60,7 +60,7 @@ printf('person id: %s\n',$person->id()); // will output the UUID of this object
 ```
 
 ### find item by id
-find will get the item by id, by default it will be read without creating an write lock.
+find will get the item by id, by default it will be read without creating an write lock, this can be changed by setting the arguments.
  
 ```php
 //  
@@ -77,7 +77,9 @@ $person->instagram;               //  @poes_kamille
 
 ```
 ### update
-by default it will be read without creating an write lock, unless $lock is set to true.
+By default read() will read the item data without creating an write lock, unless $lock is set to true.
+With update() you don't need to obtain a lock, it will do that for you.
+
 
 ```php
 
