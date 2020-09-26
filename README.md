@@ -30,6 +30,7 @@ class PersonCollection extends jsonDataCollection {
  */
  
 $db = new JsonData();
+// $db->setBaseDir('./data'); // by default it will use ./data , make sure the 'data' directory exists and is writable for you php script.
 $db->orm->addModel('person'); // this configures the orm and initialize a new PersonCollection() on $db->person.
 ```
 
