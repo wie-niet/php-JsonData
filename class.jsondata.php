@@ -6,9 +6,9 @@ class JsonData {
 }
 
 class JsonDataOrm {
-	static private $base_dir = './data'; 	// do not change after you run addModel()
-	static $quick_conf = [];		 		// runtime config	
-	static $lock_ttl = 3600; 				// ignore locks that are more than lock_ttl seconds old, set to 0 to disable.
+	static private $base_dir = './data';  	// do not change after you run addModel()
+	static $quick_conf = [];		// runtime config	
+	static $lock_ttl = 3600; 		// ignore locks that are more than lock_ttl seconds old, set to 0 to disable.
 
 	static function setBaseDir($dir) {
 		if(count(self::$quick_conf) == 0) {
