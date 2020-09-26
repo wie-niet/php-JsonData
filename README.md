@@ -5,7 +5,7 @@ Simple json datastore written in php. with basic CRUD function, *create*, read, 
 
 
 
-###setup your Models
+### setup your Models
 
 ```php
 // mymodels.php
@@ -33,7 +33,7 @@ $db = new JsonData();
 $db->orm->addModel('person'); // this configures the orm and initialize a new PersonCollection() on $db->person.
 ```
 
-###create/write/insert new item 
+### create/write/insert new item 
 All data items will get an UUID by assigned when written, you can overwrite this with $item->setId($id).
 
 ```php
@@ -53,7 +53,7 @@ printf('person id: %s\n',$person->id()); // will output the UUID of this object
 // example output# person id: f440c6b9-3f62-408d-a65d-9bcf6122386f
 ```
 
-###find item by id
+### find item by id
 find will get the item by id, by default it will be read without creating an write lock.
  
 ```php
@@ -70,7 +70,7 @@ $person->instagram;               //  @poes_kamille
 // $person->getAttr('specie', 'Unknown');  //  'Unknown'
 
 ```
-###update
+### update
 by default it will be read without creating an write lock, unless $lock is set to true.
 
 ```php
@@ -86,7 +86,7 @@ $person->update(['specie' => 'cat']);
 
 ```
 
-###delete
+### delete
 ```php
 // delete using PersonItem method delete() 
 $person->delete();
@@ -97,11 +97,12 @@ $db->person->find('f440c6b9-3f62-408d-a65d-9bcf6122386f');
 ```
 
 
-##classes and function
+## classes and function
 
 <!-- // ouput of "egrep 'class | function ' class.jsondata.php  | tr '{' ' '" -->
 ```
 class JsonData  
+
 class JsonDataOrm  
 	static function setBaseDir($dir)  
 	static function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='')  
@@ -111,9 +112,10 @@ class JsonDataOrm
 	static function getFilePathPrefix($ref)  
 	static function getFilePath($ref, $type='json')  
 	static function getFilePathWithId($ref, $id, $type='json')  
+
 class JsonDataItem  
 	public function __construct($id=null, $read=true, $lock=false)  
-    public function __toString()  
+	public function __toString()  
 	public function setId($id=false)  
 	public function id()  
 	public function created_at($format='c')  
@@ -129,6 +131,7 @@ class JsonDataItem
 	public function update($data)  
 	public function write()  			
 	public function delete()  
+	
 class JsonDataCollection  
 	public function __construct()  
 	public function getMetaAttr($key, $defaul=null)  
