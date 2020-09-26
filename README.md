@@ -30,12 +30,17 @@ class PersonCollection extends jsonDataCollection {
  */
  
 $db = new JsonData();
-// $db->setBaseDir('./data'); // by default it will use ./data , make sure the 'data' directory exists and is writable for you php script.
-$db->orm->addModel('person'); // this configures the orm and initialize a new PersonCollection() on $db->person.
+
+// $db->setBaseDir('./data'); // by default it will use ./data, 
+// make sure the 'data' directory exists and is writable for you php script.
+
+$db->orm->addModel('person'); // this configures the orm 
+// and initialize a new PersonCollection() on $db->person.
 ```
 
 ### create/write/insert new item 
 All data items will get an UUID by assigned when written, you can overwrite this with $item->setId($id).
+You always need to obtain an lock for writing unless the item is new.
 
 ```php
 // include('mymodels.php'); ...
