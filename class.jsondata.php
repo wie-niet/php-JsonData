@@ -93,22 +93,24 @@ class JsonDataOrm {
 	static function getFilePathWithId($ref, $id, $type='json') {
 		return(self::getFilePathPrefix($ref).'.'.$id.'.'.$type);
 	}
-	
+
 	function as_json($ref, $add_meta_keys=['id','created_at']) {
 		$data = [];
-		
+
 		foreach($add_meta_keys as $key) {
-			$data['__meta__'][$key] = $ref->getMetaAttr($key);
+			if ($ref->hasMetaAttr($key)) {
+				$data['__meta__'][$key] = $ref->getMetaAttr($key);
+			}
 		}
-		
+
 		foreach($ref as $key=>$val) {
 			$data[$key] = $val;
 		}
-		
-		
+
+
 		return(json_encode($data, JSON_PRETTY_PRINT));
 	}
-	
+
 	function genUuid() {
 		return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
 			// 32 bits for "time_low"
@@ -247,60 +249,66 @@ class JsonDataItem {
 			$this->setMetaAttr('created_at', time());
 		} else {
 			// existing item
-			
+
 			// set id  (when id=null , setId() will be used to set it before writing.
 			$this->setMetaAttr('id', $id);
-			
+
 			// read item
 			if ($read ) {
 				$this->read($lock);
 			}
 		}
 	}
-	
+
 	public function __toString() {
-		return(sprintf("%s(%s)",get_class($this), $this->id())); 
+		return(sprintf("%s(%s)",get_class($this), $this->id()));
 	}
-		
+
 	public function setId($id=false) {
 		if($this->id() !== null ) {
 			throw new Exception("Can't change 'id' on '$this', it's already set.");
 		}
-		
-		// set id or create new:	
+
+		// set id or create new:
 		$this->setMetaAttr('id', $id ? $id : $this->__meta__['orm']->genUuid());
-		
+
 	}
-	
+
 	public function id() {
 		return(isset($this->__meta__['id']) ? $this->__meta__['id'] : null );
 	}
-	
+
 	public function created_at($format='c') {
 		return(date($format, $this->__meta__['created_at']));
 	}
 
-	public function updated_at($format='c') {
-		if($this->__meta__['updated_at'] === null ) {
-			if( $this->is_new() ) { throw new Exception("There is no 'updated_at' timestamp, item is new."); }
+	public function read_timestamps_in_meta() {
+		$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
+		$this->setMetaAttr('updated_at', $time_stamps['updated_at']);
+		$this->setMetaAttr('accessed_at', $time_stamps['accessed_at']);
 
-			$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
-			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
-			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
-		}		
-		return(date($format, $this->__meta__['updated_at']));
+		return $time_stamps;
+	}
+
+	public function updated_at($format='c') {
+		if($this->__meta__['updated_at'] ?? False ) {
+			if( $this->is_new() ) { throw new Exception("There is no 'updated_at' timestamp, item is new."); }
+			$this->read_timestamps_in_meta();
+		}
+		return(date($format, $this->getMetaAttr('updated_at')));
 	}
 
 	public function accessed_at($format='c') {
-		if($this->__meta__['updated_at'] === null ) {
+		if($this->__meta__['accessed_at'] ?? null ) {
 			if( $this->is_new() ) { throw new Exception("There is no 'accessed_at' timestamp, item is new."); }
-
-			$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
-			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
-			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
+			$this->read_timestamps_in_meta();
 		}
-		
+
 		return(date($format, $this->__meta__['accessed_at']));
+	}
+
+	public function hasMetaAttr($key) {
+		return(isset($this->__meta__[$key]));
 	}
 
 	public function getMetaAttr($key, $defaul=null) {
@@ -341,23 +349,33 @@ class JsonDataItem {
 				throw new Exception("Can't obtain lock for '$ref'.");
 			}
 		}
-		
+
 		$json_file = $this->__meta__['orm']->getFilePath($this);
 		$json_data = json_decode(file_get_contents($json_file), true);
 
+		// verify id
+		$id = $this->id();
+		$file_id = $json_data['__meta__']['id'] ?? False;
+		if ($id != $file_id) {
+			throw new Exception("Data corrupted, id mismatch: ('$id' != '$file_id')");
+		}
+
+
 		// get meta values
 		foreach($json_data['__meta__'] as $key=>$val) {
-			$this->setMetaAttr($key, $val);
+			if (!$this->hasMetaAttr($key)) {
+				$this->setMetaAttr($key, $val);
+			}
 		}
-		unset($json_data['__meta__']); 
-		
+		unset($json_data['__meta__']);
+
 		// get data values:
 		foreach($json_data as $key=>$val) {
 			$this->$key = $val;
 			// $this->setAttr($key,$val);
 		}
 	}
-	
+
 	public function update($data) {
 		// update all key=>values
 		$this->read(true);
@@ -386,12 +404,12 @@ class JsonDataCollection {
 	protected $__meta__ = [];
 
 	// $__meta__['orm']
-		
+
 	public function __construct($orm) {
 		$this->setMetaAttr('orm', $orm);
 	}
-	
-	
+
+
 	public function getMetaAttr($key, $defaul=null) {
 		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
@@ -400,21 +418,21 @@ class JsonDataCollection {
 		$this->__meta__[$key] = $value;
 	}
 
-	
+
 	public function find($id, $read=true, $lock=false) {
-		
+
 		$json_file = $this->__meta__['orm']->getFilePathWithId($this, $id);
 		if ( file_exists($json_file) ) {
 			return($read ? $this->read($id, $lock) : true);
 		}
 		return(false);
 	}
-	
+
 	public function new($data=[]) {
 		// $item_classname = $this->getMetaAttr('item_classname');
 		$item_classname = $this->__meta__['orm']->getItemClassName(get_class($this));
 		$item = new $item_classname($this->__meta__['orm']);
-		
+
 		// set data:
 		foreach($data as $key => $val) {
 			$item->setAttr($key, $val);
