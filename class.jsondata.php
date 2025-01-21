@@ -18,7 +18,7 @@ class JsonData {
 
 class JsonDataOrm {
 	static private $base_dir = './data';  	// do not change after you run addModel()
-	static $quick_conf = [];		// runtime config	
+	static $quick_conf = [];		// runtime config
 	static $lock_ttl = 3600; 		// ignore locks that are more than lock_ttl seconds old, set to 0 to disable.
 
 	static function setBaseDir($dir) {
@@ -28,11 +28,11 @@ class JsonDataOrm {
 			throw new Exception('You must setBaseDir before you add your Models');
 		}
 	}
-	
-	
-	
+
+
+
 	function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
-		
+
 		// by default look for CamelCase model_name : ModelNameCollection
 		if (!$collection_class_name) {
 			$collection_class_name = str_replace('_', '',ucwords($model_name, "_").'Collection');
@@ -42,21 +42,21 @@ class JsonDataOrm {
 		if (!$item_class_name) {
 			$item_class_name = str_replace('_', '',ucwords($model_name, "_").'Item');
 		}
-		
+
 		// compose json/lock/temp file prefix:
 		$file_path_prefix = self::$base_dir .'/'. $extra_path_prefix . $model_name;
-		
+
 		// quick_conf[$model_name] = ['model_name', 'CollectionClassName', 'ItemClassName','file_path_prefix']
 		$quick_conf = [$model_name, $collection_class_name, $item_class_name, $file_path_prefix];
-		
-		// set the array by reference 
+
+		// set the array by reference
 		self::$quick_conf[$model_name] = &$quick_conf;
 		self::$quick_conf[$collection_class_name] = &$quick_conf;
 		self::$quick_conf[$item_class_name] = &$quick_conf;
-		
+
 		// add instance of CollectionClass on JsonData object.
 		$db->$model_name = new $collection_class_name($this);
-		
+
 	}
 
 	/*
@@ -82,7 +82,7 @@ class JsonDataOrm {
 		$ref = is_string($ref) ? $ref : get_class($ref);
 		return(self::$quick_conf[$ref][3]);
 	}
-	
+
 	/*
 	 * Tools:
 	 */
@@ -131,7 +131,7 @@ class JsonDataOrm {
 		);
 	}
 
-	
+
 	/*
 	 * json | lock | temp file tools:
 	 */
@@ -140,35 +140,35 @@ class JsonDataOrm {
 		// 9	mtime	time of last modification (Unix timestamp)
 		$file_stat = stat(self::getFilePath($ref));
 		return(array('updated_at'=> $file_stat['mtime'], 'accessed_at'=> $file_stat['atime']));
-		
+
 	}
-	
+
 	function lock($ref) {
 		$lock_file = self::getFilePath($ref, 'lock');
-				
+
 		// check if lock already exists
 		if (self::haslock($ref)) {
-			throw new Exception("Lock file already exists for '$model_name($id)'.");
+			throw new Exception("Lock file already exists for '$lock_file'.");
 			return(false);
-		}		
+		}
 
 		// will return true on succes
 		return(touch($lock_file));
 	}
-	
+
 	function haslock($ref) {
 		$lock_file = self::getFilePath($ref, 'lock');
 		// check if lock already exists
-		if (!file_exists($lock_file)) {			
+		if (!file_exists($lock_file)) {
 			return(false);
 		}
-		
-		// is file older than $lock_ttl	, set to 0 or less to disable 
+
+		// is file older than $lock_ttl	, set to 0 or less to disable
 		if( (self::$lock_ttl <= 0) or time() - filemtime($lock_file) < self::$lock_ttl) {
 			// age is still under ttl, we will not get the lock
 			return(true);
 		}
-		
+
 		// cleanup old lock
 		return(unlink($lock_file));
 
@@ -179,15 +179,15 @@ class JsonDataOrm {
 		$lock_file = self::getFilePath($ref, 'lock');
 		return(unlink($lock_file));
 	}
-	
+
 	// moved ::read() to JsonDataItem->read()
-	
-	function write($ref) {		
+
+	function write($ref) {
 		// put it in file
 
 		// create: setId for new objects
 		if($ref->id() === null ) {
-			$ref->setId();				
+			$ref->setId();
 		}
 
 		$json_file = self::getFilePath($ref);
@@ -195,40 +195,40 @@ class JsonDataOrm {
 
 		// set $no_lock if this json file is new ( == doesn't exist)
 		$no_lock = !file_exists($json_file);
-			
+
 		// check lock , use no_lock for writing new json data
 		if(!$no_lock) {
 			if(!self::haslock($ref)) {
 				throw new Exception("No lock on '$ref', lock() or read(lock=true) before writing.");
 			}
 		}
-		
+
 
 		$json_data = self::as_json($ref);
 		// $json_data = $ref->as_json();
-		
-		// first write data to 
+
+		// first write data to
 		if (!file_put_contents($temp_file, $json_data)) {
 			throw new Exception("Can't write to temp file for '$ref'.");
 		}
-		
+
 		// move temp file inplace.
 		if(!rename($temp_file, $json_file)) {
-			throw new Exception("Can't write to data file for '$ref'.");			
-		}	
-		
+			throw new Exception("Can't write to data file for '$ref'.");
+		}
+
 		// unlock
 		if(!$no_lock) {
 			self::unlock($ref);
 		}
-		
+
 	}
-	
+
 	function delete($ref, $id) {
 		$json_file = self::getFilePathWithId($ref, $id);
 		return(unlink($json_file));
 	}
-	
+
 }
 
 
@@ -311,8 +311,6 @@ class JsonDataItem {
 		$this->__meta__[$key] = $value;
 	}
 
-
-
 	public function getAttr($key, $defaul=null) {
 		return(isset($this->$key) ? $this->$key : $default);
 	}
@@ -321,20 +319,20 @@ class JsonDataItem {
 		$this->$key = $value;
 	}
 
-	public function as_json() {
+	public function as_json($add_meta_keys=['id','created_at']) {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']->as_json($this));
+		return($this->__meta__['orm']->as_json($this, $add_meta_keys));
 	}
-	
+
 	public function getFilePath($type='json') {
 		// pass this to JsonDataOrm::function
 		return($this->__meta__['orm']->getFilePath($this));
 	}
-	
+
 	public function is_new() {
 		return($this->id() === null or ! file_exists($this->getFilePath()));
 	}
-	
+
 	function read($lock=false) {
 		// obtain lock incase we read for write.
 		if($lock) {
@@ -373,12 +371,12 @@ class JsonDataItem {
 		// pass this to JsonDataOrm::function
 		return($this->__meta__['orm']->write($this));
 	}
-	
+
 	public function delete() {
 		// pass this to JsonDataOrm::function
 		return($this->__meta__['orm']->delete($this, $this->id()));
 	}
-	
+
 }
 
 
@@ -424,11 +422,11 @@ class JsonDataCollection {
 
 		return($item);
 	}
-	
+
 	public function read($id, $lock=false) {
 		$item_classname = $this->__meta__['orm']->getItemClassName(get_class($this));
 		$item = new $item_classname($this->__meta__['orm'] ,$id, true, $lock);
-				
+
 		return($item);
 	}
 
