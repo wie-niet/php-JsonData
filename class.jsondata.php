@@ -1,9 +1,20 @@
 <?php
 
+
 class JsonData {
-	public $orm =  JsonDataOrm;
-		 
+	// public $orm = JsonDataOrm;
+	public $orm;
+
+	public function __construct($orm=Null) {
+		$this->orm = $orm ?? new JsonDataOrm();
+	}
+
+	function addModel($model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
+		$db = $this;
+		$this->orm->addModel($db, $model_name, $collection_class_name, $item_class_name, $extra_path_prefix);
+	}
 }
+
 
 class JsonDataOrm {
 	static private $base_dir = './data';  	// do not change after you run addModel()
@@ -20,7 +31,7 @@ class JsonDataOrm {
 	
 	
 	
-	static function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
+	function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
 		
 		// by default look for CamelCase model_name : ModelNameCollection
 		if (!$collection_class_name) {
@@ -44,7 +55,7 @@ class JsonDataOrm {
 		self::$quick_conf[$item_class_name] = &$quick_conf;
 		
 		// add instance of CollectionClass on JsonData object.
-		$db->$model_name = new $collection_class_name();
+		$db->$model_name = new $collection_class_name($this);
 		
 	}
 
@@ -153,7 +164,7 @@ class JsonDataOrm {
 		}
 		
 		// is file older than $lock_ttl	, set to 0 or less to disable 
-		if( ($lock_ttl <= 0) or time() - filemtime($lock_file) < self::$lock_ttl) {
+		if( (self::$lock_ttl <= 0) or time() - filemtime($lock_file) < self::$lock_ttl) {
 			// age is still under ttl, we will not get the lock
 			return(true);
 		}
@@ -222,12 +233,15 @@ class JsonDataOrm {
 
 
 class JsonDataItem {
-	protected $__meta__ = ['orm'=>JsonDataOrm];
+	// protected $__meta__ = ['orm'=>JsonDataOrm];
+	protected $__meta__ = [];
 	// $__meta__['id']
 	// $__meta__['orm']
 
 
-	public function __construct($id=null, $read=true, $lock=false) {
+	public function __construct($orm, $id=null, $read=true, $lock=false) {
+		$this->setMetaAttr('orm', $orm);
+
 		if($id === null) {
 			// new item; set created_at time
 			$this->setMetaAttr('created_at', time());
@@ -254,7 +268,7 @@ class JsonDataItem {
 		}
 		
 		// set id or create new:	
-		$this->setMetaAttr('id', $id ? $id : $this->__meta__['orm']::genUuid());
+		$this->setMetaAttr('id', $id ? $id : $this->__meta__['orm']->genUuid());
 		
 	}
 	
@@ -270,7 +284,7 @@ class JsonDataItem {
 		if($this->__meta__['updated_at'] === null ) {
 			if( $this->is_new() ) { throw new Exception("There is no 'updated_at' timestamp, item is new."); }
 
-			$time_stamps = $this->__meta__['orm']::getFileTimeStamps($this);
+			$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
 			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
 			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
 		}		
@@ -281,7 +295,7 @@ class JsonDataItem {
 		if($this->__meta__['updated_at'] === null ) {
 			if( $this->is_new() ) { throw new Exception("There is no 'accessed_at' timestamp, item is new."); }
 
-			$time_stamps = $this->__meta__['orm']::getFileTimeStamps($this);
+			$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
 			$this->__meta__['updated_at'] = $time_stamps['updated_at'];
 			$this->__meta__['accessed_at'] = $time_stamps['accessed_at'];
 		}
@@ -309,12 +323,12 @@ class JsonDataItem {
 
 	public function as_json() {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']::as_json($this));
+		return($this->__meta__['orm']->as_json($this));
 	}
 	
 	public function getFilePath($type='json') {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']::getFilePath($this));
+		return($this->__meta__['orm']->getFilePath($this));
 	}
 	
 	public function is_new() {
@@ -325,12 +339,12 @@ class JsonDataItem {
 		// obtain lock incase we read for write.
 		if($lock) {
 			// try to obtain lock first
-			if(!$this->__meta__['orm']::lock($this)) {
+			if(!$this->__meta__['orm']->lock($this)) {
 				throw new Exception("Can't obtain lock for '$ref'.");
 			}
 		}
 		
-		$json_file = $this->__meta__['orm']::getFilePath($this);
+		$json_file = $this->__meta__['orm']->getFilePath($this);
 		$json_data = json_decode(file_get_contents($json_file), true);
 
 		// get meta values
@@ -355,14 +369,14 @@ class JsonDataItem {
 		$this->write();
 	}
 
-	public function write() {			
+	public function write() {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']::write($this));
+		return($this->__meta__['orm']->write($this));
 	}
 	
 	public function delete() {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']::delete($this, $this->id()));
+		return($this->__meta__['orm']->delete($this, $this->id()));
 	}
 	
 }
@@ -370,11 +384,13 @@ class JsonDataItem {
 
 class JsonDataCollection {
 	// public $__meta__ = [];
-	protected $__meta__ = ['orm'=>JsonDataOrm];
+	// protected $__meta__ = ['orm'=>JsonDataOrm];
+	protected $__meta__ = [];
 
 	// $__meta__['orm']
 		
-	public function __construct() {
+	public function __construct($orm) {
+		$this->setMetaAttr('orm', $orm);
 	}
 	
 	
@@ -389,7 +405,7 @@ class JsonDataCollection {
 	
 	public function find($id, $read=true, $lock=false) {
 		
-		$json_file = $this->__meta__['orm']::getFilePathWithId($this, $id);
+		$json_file = $this->__meta__['orm']->getFilePathWithId($this, $id);
 		if ( file_exists($json_file) ) {
 			return($read ? $this->read($id, $lock) : true);
 		}
@@ -398,8 +414,8 @@ class JsonDataCollection {
 	
 	public function new($data=[]) {
 		// $item_classname = $this->getMetaAttr('item_classname');
-		$item_classname = $this->__meta__['orm']::getItemClassName(get_class($this));
-		$item = new $item_classname();
+		$item_classname = $this->__meta__['orm']->getItemClassName(get_class($this));
+		$item = new $item_classname($this->__meta__['orm']);
 		
 		// set data:
 		foreach($data as $key => $val) {
@@ -410,14 +426,14 @@ class JsonDataCollection {
 	}
 	
 	public function read($id, $lock=false) {
-		$item_classname = $this->__meta__['orm']::getItemClassName(get_class($this));
-		$item = new $item_classname($id, true, $lock);
+		$item_classname = $this->__meta__['orm']->getItemClassName(get_class($this));
+		$item = new $item_classname($this->__meta__['orm'] ,$id, true, $lock);
 				
 		return($item);
 	}
 
 	public function delete($id) {
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']::delete($this, $id));
+		return($this->__meta__['orm']->delete($this, $id));
 	}
 }

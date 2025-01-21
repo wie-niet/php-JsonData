@@ -35,7 +35,8 @@ $db = new JsonData();
 // $db->setBaseDir('./data'); // by default it will use ./data, 
 // make sure the 'data' directory exists and is writable for you php script.
 
-$db->orm->addModel('person'); // this configures the orm 
+// $db->orm->addModel($db, 'person'); // this configures the orm 
+$db->addModel('person'); // short version 
 // and initialize a new PersonCollection() on $db->person.
 ```
 
@@ -111,19 +112,17 @@ $db->person->find('f440c6b9-3f62-408d-a65d-9bcf6122386f');
 <!-- // ouput of "egrep 'class | function ' class.jsondata.php  | tr '{' ' '" -->
 ```
 class JsonData  
-
+	public function __construct($orm=Null)  
 class JsonDataOrm  
 	static function setBaseDir($dir)  
-	static function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='')  
 	static function getModelName($ref)  
 	static function getCollectionClassName($ref)  
 	static function getItemClassName($ref)  
 	static function getFilePathPrefix($ref)  
 	static function getFilePath($ref, $type='json')  
 	static function getFilePathWithId($ref, $id, $type='json')  
-
 class JsonDataItem  
-	public function __construct($id=null, $read=true, $lock=false)  
+	public function __construct($orm, $id=null, $read=true, $lock=false)  
 	public function __toString()  
 	public function setId($id=false)  
 	public function id()  
@@ -131,18 +130,17 @@ class JsonDataItem
 	public function updated_at($format='c')  
 	public function accessed_at($format='c')  
 	public function getMetaAttr($key, $defaul=null)  
-	*private function setMetaAttr($key, $value)*  
+	private function setMetaAttr($key, $value)  
 	public function getAttr($key, $defaul=null)  
 	public function setAttr($key, $value)  
 	public function as_json()  
 	public function getFilePath($type='json')  
 	public function is_new()  
 	public function update($data)  
-	public function write()  			
+	public function write()  
 	public function delete()  
-	
 class JsonDataCollection  
-	public function __construct()  
+	public function __construct($orm)  
 	public function getMetaAttr($key, $defaul=null)  
 	public function setMetaAttr($key, $value)  
 	public function find($id, $read=true, $lock=false)  
