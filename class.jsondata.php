@@ -353,7 +353,7 @@ class JsonDataItem {
 		return(isset($this->__meta__[$key]));
 	}
 
-	public function getMetaAttr($key, $defaul=null) {
+	public function getMetaAttr($key, $default=null) {
 		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
 
@@ -361,7 +361,7 @@ class JsonDataItem {
 		$this->__meta__[$key] = $value;
 	}
 
-	public function getAttr($key, $defaul=null) {
+	public function getAttr($key, $default=null) {
 		return(isset($this->$key) ? $this->$key : $default);
 	}
 
@@ -498,7 +498,7 @@ class JsonDataCollection {
 		$this->setMetaAttr('orm', $orm);
 	}
 
-	public function getMetaAttr($key, $defaul=null) {
+	public function getMetaAttr($key, $default=null) {
 		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
 
