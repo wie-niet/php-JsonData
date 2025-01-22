@@ -1,9 +1,9 @@
 # php-JsonData
 
-Simple json datastore written in php. 
+Simple json datastore written in php.
 
 With basic CRUD functions, *create*, read, update, delete.
-read and write with write-lock capabilities. uses standard uuid. 
+read and write with write-lock capabilities. uses standard uuid.
 
 
 ### setup your Models
@@ -14,7 +14,7 @@ read and write with write-lock capabilities. uses standard uuid.
 include('class.jsondata.php');
 
 /*
- * define your Model 
+ * define your Model
  */
 
 class PersonItem extends jsonDataItem {
@@ -50,7 +50,7 @@ You always need to obtain an lock for writing unless the item is new.
 $person = $db->person->new();
 $person->name = 'Kamile';
 $person->instagram = '@poes_kamille';
-$person->write();		
+$person->write();
 
 // you can also use setAttr($key, $val)
 // $person->setAttr('name', 'Kamille');   // another way to set attributes
@@ -63,9 +63,9 @@ printf('person id: %s\n',$person->id()); // will output the UUID of this object
 
 ### find item by id
 find will get the item by id, by default it will be read without creating an write lock, this can be changed by setting the arguments.
- 
+
 ```php
-//  
+//
 $person = $db->person->find('f440c6b9-3f62-408d-a65d-9bcf6122386f');
 $person->name;                    //  Kamile
 $person->instagram;               //  @poes_kamille
@@ -74,7 +74,7 @@ $person->instagram;               //  @poes_kamille
 // you can also use getAttr($key, $default=none)
 // $person->getAttr('name');      //  Kamile
 
-// using default 
+// using default
 // $person->getAttr('specie', 'Unknown');  //  'Unknown'
 
 ```
