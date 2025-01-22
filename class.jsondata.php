@@ -6,20 +6,21 @@ class JsonData {
 	public $orm;
 
 	public function __construct($orm=Null) {
-		$this->orm = $orm ?? new JsonDataOrm();
-	}
-
-	function addModel($model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
-		$db = $this;
-		$this->orm->addModel($db, $model_name, $collection_class_name, $item_class_name, $extra_path_prefix);
+		$this->orm = $orm ?? new JsonDataOrm($this, './data');
 	}
 }
 
 
 class JsonDataOrm {
-	static private $base_dir = './data';  	// do not change after you run addModel()
+	static private $parent_db;
+	static private $base_dir;	  	// do not change after you run addModel()
 	static $quick_conf = [];		// runtime config
 	static $lock_ttl = 3600; 		// ignore locks that are more than lock_ttl seconds old, set to 0 to disable.
+
+	public function __construct($parent_db, $base_dir) {
+		self::$base_dir = $base_dir;
+		self::$parent_db = $parent_db;
+	}
 
 	static function setBaseDir($dir) {
 		if(count(self::$quick_conf) == 0) {
@@ -31,7 +32,7 @@ class JsonDataOrm {
 
 
 
-	function addModel($db, $model_name, $collection_class_name=false, $item_class_name=false, $extra_path_prefix='') {
+	public function addModel($model_name, $collection_class_name=false, $item_class_name=false, $hooks_class_name=false) {
 
 		// by default look for CamelCase model_name : ModelNameCollection
 		if (!$collection_class_name) {
@@ -43,11 +44,19 @@ class JsonDataOrm {
 			$item_class_name = str_replace('_', '',ucwords($model_name, "_").'Item');
 		}
 
-		// compose json/lock/temp file prefix:
-		$file_path_prefix = self::$base_dir .'/'. $extra_path_prefix . $model_name;
+		// by default look for CamelCase model_name : ModelNameHooks
+		if (!$hooks_class_name) {
+			$hooks_class_name = str_replace('_', '',ucwords($model_name, "_").'Hooks');
+			if (!class_exists($hooks_class_name)){
+				$hooks_class_name = 'jsonDataHooks';
+			}
+		}
 
-		// quick_conf[$model_name] = ['model_name', 'CollectionClassName', 'ItemClassName','file_path_prefix']
-		$quick_conf = [$model_name, $collection_class_name, $item_class_name, $file_path_prefix];
+		// compose json/lock/temp file prefix:
+		$file_path_prefix = self::$base_dir .'/'. $model_name;
+
+		// quick_conf[$model_name] = ['model_name', 'CollectionClassName', 'ItemClassName','HooksClassName','file_path_prefix']
+		$quick_conf = [$model_name, $collection_class_name, $item_class_name, $hooks_class_name, $file_path_prefix];
 
 		// set the array by reference
 		self::$quick_conf[$model_name] = &$quick_conf;
@@ -55,7 +64,8 @@ class JsonDataOrm {
 		self::$quick_conf[$item_class_name] = &$quick_conf;
 
 		// add instance of CollectionClass on JsonData object.
-		$db->$model_name = new $collection_class_name($this);
+		// $this->parent_db->$model_name = new $collection_class_name($this);
+		self::$parent_db->$model_name = new $collection_class_name($this);
 
 	}
 
@@ -78,9 +88,16 @@ class JsonDataOrm {
 		return(self::$quick_conf[$ref][2]);
 	}
 
+	static function getHooksObject($ref) {
+		$ref = is_string($ref) ? $ref : get_class($ref);
+		$klass = self::$quick_conf[$ref][3];
+		return(new $klass);
+	}
+
+
 	static function getFilePathPrefix($ref) {
 		$ref = is_string($ref) ? $ref : get_class($ref);
-		return(self::$quick_conf[$ref][3]);
+		return(self::$quick_conf[$ref][4]);
 	}
 
 	/*
@@ -94,8 +111,19 @@ class JsonDataOrm {
 		return(self::getFilePathPrefix($ref).'.'.$id.'.'.$type);
 	}
 
-	function as_json($ref, $add_meta_keys=['id','created_at']) {
+	public function exists($ref, $id, $type='json') {
+		return(file_exists(self::getFilePathPrefix($ref).'.'.$id.'.'.$type));
+	}
+
+
+
+	public function as_json($ref, $add_meta_keys=['id','created_at']) {
 		$data = [];
+
+		// $add_meta_keys = True means all:
+		if ($add_meta_keys === True) {
+			$add_meta_keys = ['id', 'state','created_at', 'updated_at', 'accessed_at'];
+		}
 
 		foreach($add_meta_keys as $key) {
 			if ($ref->hasMetaAttr($key)) {
@@ -111,7 +139,7 @@ class JsonDataOrm {
 		return(json_encode($data, JSON_PRETTY_PRINT));
 	}
 
-	function genUuid() {
+	public function genUuid() {
 		return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
 			// 32 bits for "time_low"
 			mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
@@ -137,15 +165,14 @@ class JsonDataOrm {
 	/*
 	 * json | lock | temp file tools:
 	 */
-	function getFileTimeStamps($ref) {
+	public function getFileTimeStamps($ref) {
 		// 8	atime	time of last access (Unix timestamp)
 		// 9	mtime	time of last modification (Unix timestamp)
 		$file_stat = stat(self::getFilePath($ref));
 		return(array('updated_at'=> $file_stat['mtime'], 'accessed_at'=> $file_stat['atime']));
-
 	}
 
-	function lock($ref) {
+	public function lock($ref) {
 		$lock_file = self::getFilePath($ref, 'lock');
 
 		// check if lock already exists
@@ -158,7 +185,7 @@ class JsonDataOrm {
 		return(touch($lock_file));
 	}
 
-	function haslock($ref) {
+	public function haslock($ref) {
 		$lock_file = self::getFilePath($ref, 'lock');
 		// check if lock already exists
 		if (!file_exists($lock_file)) {
@@ -177,14 +204,14 @@ class JsonDataOrm {
 		return(false);
 	}
 
-	function unlock($ref) {
+	public function unlock($ref) {
 		$lock_file = self::getFilePath($ref, 'lock');
 		return(unlink($lock_file));
 	}
 
 	// moved ::read() to JsonDataItem->read()
 
-	function write($ref) {
+	public function write($ref) {
 		// put it in file
 
 		// create: setId for new objects
@@ -226,7 +253,7 @@ class JsonDataOrm {
 
 	}
 
-	function delete($ref, $id) {
+	public function delete($ref, $id) {
 		$json_file = self::getFilePathWithId($ref, $id);
 		return(unlink($json_file));
 	}
@@ -247,6 +274,9 @@ class JsonDataItem {
 		if($id === null) {
 			// new item; set created_at time
 			$this->setMetaAttr('created_at', time());
+
+			// set state: new
+			$this->setMetaAttr('state', 'new');
 		} else {
 			// existing item
 
@@ -258,6 +288,11 @@ class JsonDataItem {
 				$this->read($lock);
 			}
 		}
+
+		// call hook on_init()
+		$hooks = $this->__meta__['orm']->getHooksObject($this);
+		if (method_exists($hooks, 'on_init')) { $hooks->on_init($this); }
+
 	}
 
 	public function __toString() {
@@ -265,8 +300,15 @@ class JsonDataItem {
 	}
 
 	public function setId($id=false) {
+		// TODO: validate id (no dots, whitespaces ...)
+
 		if($this->id() !== null ) {
 			throw new Exception("Can't change 'id' on '$this', it's already set.");
+		}
+
+		// check if already exists
+		if ($this->__meta__['orm']->exists($this, $id)) {
+			throw new Exception("Can't set 'id' to '$id', it's object already exists.");
 		}
 
 		// set id or create new:
@@ -283,6 +325,8 @@ class JsonDataItem {
 	}
 
 	public function read_timestamps_in_meta() {
+		if( !$this->exists() ) { throw new Exception("There are no timestamps, item doesn't exist."); }
+
 		$time_stamps = $this->__meta__['orm']->getFileTimeStamps($this);
 		$this->setMetaAttr('updated_at', $time_stamps['updated_at']);
 		$this->setMetaAttr('accessed_at', $time_stamps['accessed_at']);
@@ -292,7 +336,6 @@ class JsonDataItem {
 
 	public function updated_at($format='c') {
 		if($this->__meta__['updated_at'] ?? False ) {
-			if( $this->is_new() ) { throw new Exception("There is no 'updated_at' timestamp, item is new."); }
 			$this->read_timestamps_in_meta();
 		}
 		return(date($format, $this->getMetaAttr('updated_at')));
@@ -300,7 +343,6 @@ class JsonDataItem {
 
 	public function accessed_at($format='c') {
 		if($this->__meta__['accessed_at'] ?? null ) {
-			if( $this->is_new() ) { throw new Exception("There is no 'accessed_at' timestamp, item is new."); }
 			$this->read_timestamps_in_meta();
 		}
 
@@ -337,11 +379,23 @@ class JsonDataItem {
 		return($this->__meta__['orm']->getFilePath($this));
 	}
 
-	public function is_new() {
-		return($this->id() === null or ! file_exists($this->getFilePath()));
+	public function exists() {
+		return($this->__meta__['orm']->exists($this, $this->id()));
 	}
 
-	function read($lock=false) {
+	public function is_new() {
+		return($this->getMetaAttr('state') == 'new');
+	}
+
+	public function is_created() {
+		return($this->getMetaAttr('state') == 'created');
+	}
+
+	public function is_deleted() {
+		return($this->getMetaAttr('state') == 'deleted');
+	}
+
+	public function read($lock=false) {
 		// obtain lock incase we read for write.
 		if($lock) {
 			// try to obtain lock first
@@ -386,13 +440,48 @@ class JsonDataItem {
 	}
 
 	public function write() {
-		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']->write($this));
+		// call hook on_write()
+		$hooks = $this->__meta__['orm']->getHooksObject($this);
+		if (method_exists($hooks, 'on_write')) { $hooks->on_write($this); }
+
+		// used to set state
+		$exists = $this->exists();
+
+		try {
+			// pass this to JsonDataOrm::function
+			$this->__meta__['orm']->write($this);
+		}
+		catch (Exception $e) {
+			if (method_exists($hooks, 'on_write_failed')) { $hooks->on_write_failed($this); }
+			throw $e;
+		}
+
+		// set created if file is first written.
+		if (!$exists) {
+			// set state: created
+			$this->setMetaAttr('state', 'created');
+		}
+		if (method_exists($hooks, 'on_write_success')) { $hooks->on_write_success($this); }
+
 	}
 
 	public function delete() {
+		if(!$this->exists()) { return false; }
+
+		// call hooks
+		$hooks = $this->__meta__['orm']->getHooksObject($this);
+		if (method_exists($hooks, 'on_delete')) { $hooks->on_delete($this); }
+
 		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']->delete($this, $this->id()));
+		if($this->__meta__['orm']->delete($this, $this->id())) {
+			$this->setMetaAttr('state', 'deleted');
+			if (method_exists($hooks, 'on_delete_success')) { $hooks->on_delete_success($this); }
+
+			return(true);
+		} else {
+			if (method_exists($hooks, 'on_delete_failed')) { $hooks->on_delete_failed($this); }
+			return(false);
+		}
 	}
 
 }
@@ -409,7 +498,6 @@ class JsonDataCollection {
 		$this->setMetaAttr('orm', $orm);
 	}
 
-
 	public function getMetaAttr($key, $defaul=null) {
 		return(isset($this->__meta__[$key]) ? $this->__meta__[$key] : $default);
 	}
@@ -418,6 +506,9 @@ class JsonDataCollection {
 		$this->__meta__[$key] = $value;
 	}
 
+	public function exists($id) {
+		return($this->__meta__['orm']->exists($this, $id));
+	}
 
 	public function find($id, $read=true, $lock=false) {
 
@@ -449,7 +540,49 @@ class JsonDataCollection {
 	}
 
 	public function delete($id) {
-		// pass this to JsonDataOrm::function
-		return($this->__meta__['orm']->delete($this, $id));
+		if(!$this->exists($id)) { return false; }
+
+		// check if this Item has delete* hooks defined
+		$hooks = $this->__meta__['orm']->getHooksObject($this);
+		if (method_exists($hooks, 'on_delete') or method_exists($hooks, 'on_delete_success') or method_exists($hooks, 'on_delete_failed')) {
+			// exec delete on item so that hooks are called:
+			$item = $this->find($id);
+			return($item->delete());
+		} else {
+			return($this->__meta__['orm']->delete($this, $id));
+		}
 	}
+}
+
+class jsonDataHooks {
+	// Hooks are only called when they exist
+
+
+	// public function on_init($ref) {
+	// 	// hint use is_new() or exists()
+	// }
+	//
+	// public function on_write($ref) {
+	// 	// hint use is_new() or exists()
+	// }
+	//
+	// public function on_write_success($ref) {
+	// 	// hint use is_created()
+	// }
+	//
+	// public function on_write_failed($ref) {
+	// 	// hint use is_new() or exists()
+	// }
+	//
+	// public function on_delete($ref) {
+	// }
+	//
+	// public function on_delete_succes($ref) {
+	// }
+	//
+	// public function on_delete_failed($ref) {
+	// }
+	//
+	// // // *before on_write validate ?
+
 }
